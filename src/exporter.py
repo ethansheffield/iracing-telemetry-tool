@@ -6,33 +6,11 @@ from pathlib import Path
 
 
 class DataExporter:
-    """
-    Exports telemetry data from stored sessions to CSV format.
-
-    Handles loading session data and converting lap telemetry to
-    CSV files for external analysis tools.
-    """
-
     def __init__(self, export_dir="data/exports"):
-        """
-        Initialize the data exporter.
-
-        Args:
-            export_dir (str): Directory to save exported CSV files
-        """
         self.export_dir = Path(export_dir)
         self.export_dir.mkdir(parents=True, exist_ok=True)
 
     def load_session(self, session_filepath):
-        """
-        Load session data from JSON file.
-
-        Args:
-            session_filepath (str): Path to session JSON file
-
-        Returns:
-            dict: Session data or None if file not found
-        """
         try:
             with open(session_filepath, 'r') as f:
                 return json.load(f)
@@ -43,21 +21,11 @@ class DataExporter:
             return None
 
     def export_complete_session_to_csv(self, session_data):
-        """
-        Export all laps from a session to a single CSV file.
-
-        Args:
-            session_data (dict): Complete session data
-
-        Returns:
-            str: Path to exported CSV file, or None if export failed
-        """
         laps = session_data.get('laps', [])
         if not laps:
             print("Error: No laps found in session")
             return None
 
-        # Generate filename
         metadata = session_data.get('metadata', {})
         track_name = metadata.get('track_name', 'Unknown').replace(' ', '_').replace('/', '-')
         session_type = metadata.get('session_type', 'Unknown').replace(' ', '_')
@@ -66,7 +34,6 @@ class DataExporter:
         filename = f"{track_name}_{session_type}_{timestamp}_complete.csv"
         filepath = self.export_dir / filename
 
-        # Write CSV file
         with open(filepath, 'w', newline='') as csvfile:
             fieldnames = ['lap', 'time', 'distance', 'distance_pct', 'speed',
                          'throttle', 'brake', 'steering', 'gear', 'rpm',
@@ -76,7 +43,6 @@ class DataExporter:
             writer.writeheader()
 
             for lap in laps:
-                # Convert 0-based lap_number to 1-based for output
                 lap_number_display = lap.get('lap_number', 0) + 1
                 telemetry = lap.get('telemetry', [])
 
@@ -101,20 +67,8 @@ class DataExporter:
         return str(filepath)
 
     def export_lap_to_csv(self, session_data, lap_number):
-        """
-        Export a single lap's telemetry data to CSV.
-
-        Args:
-            session_data (dict): Complete session data
-            lap_number (int): Lap number to export (1-based, as user sees it)
-
-        Returns:
-            str: Path to exported CSV file, or None if export failed
-        """
-        # Convert from 1-based user input to 0-based array index
         lap_index = lap_number - 1
 
-        # Find the requested lap
         lap_data = None
         for lap in session_data.get('laps', []):
             if lap.get('lap_number') == lap_index:
@@ -125,13 +79,11 @@ class DataExporter:
             print(f"Error: Lap {lap_number} not found in session")
             return None
 
-        # Check if lap has telemetry data
         telemetry = lap_data.get('telemetry', [])
         if not telemetry or len(telemetry) == 0:
             print(f"Error: Lap {lap_number} has no telemetry data")
             return None
 
-        # Generate filename
         metadata = session_data.get('metadata', {})
         track_name = metadata.get('track_name', 'Unknown').replace(' ', '_').replace('/', '-')
         session_type = metadata.get('session_type', 'Unknown').replace(' ', '_')
@@ -140,7 +92,6 @@ class DataExporter:
         filename = f"{track_name}_{session_type}_lap{lap_number}_{timestamp}.csv"
         filepath = self.export_dir / filename
 
-        # Write CSV file
         with open(filepath, 'w', newline='') as csvfile:
             fieldnames = ['lap', 'time', 'distance', 'distance_pct', 'speed',
                          'throttle', 'brake', 'steering', 'gear', 'rpm',
@@ -170,20 +121,8 @@ class DataExporter:
         return str(filepath)
 
     def export_multiple_laps_to_csv(self, session_data, lap_numbers):
-        """
-        Export multiple laps' telemetry data to a single CSV.
-
-        Args:
-            session_data (dict): Complete session data
-            lap_numbers (list): List of lap numbers to export (1-based, as user sees them)
-
-        Returns:
-            str: Path to exported CSV file, or None if export failed
-        """
-        # Collect all requested laps
         laps_to_export = []
         for lap_number in lap_numbers:
-            # Convert from 1-based user input to 0-based array index
             lap_index = lap_number - 1
             for lap in session_data.get('laps', []):
                 if lap.get('lap_number') == lap_index:
@@ -194,7 +133,6 @@ class DataExporter:
             print("Error: None of the requested laps found in session")
             return None
 
-        # Generate filename
         metadata = session_data.get('metadata', {})
         track_name = metadata.get('track_name', 'Unknown').replace(' ', '_').replace('/', '-')
         session_type = metadata.get('session_type', 'Unknown').replace(' ', '_')
@@ -204,7 +142,6 @@ class DataExporter:
         filename = f"{track_name}_{session_type}_laps{lap_range}_{timestamp}.csv"
         filepath = self.export_dir / filename
 
-        # Write CSV file
         with open(filepath, 'w', newline='') as csvfile:
             fieldnames = ['lap', 'time', 'distance', 'distance_pct', 'speed',
                          'throttle', 'brake', 'steering', 'gear', 'rpm',
@@ -214,7 +151,6 @@ class DataExporter:
             writer.writeheader()
 
             for lap in laps_to_export:
-                # Convert 0-based lap_number to 1-based for CSV output
                 lap_number_display = lap.get('lap_number', 0) + 1
                 telemetry = lap.get('telemetry', [])
 
@@ -239,20 +175,10 @@ class DataExporter:
         return str(filepath)
 
     def _interpolate_telemetry(self, telemetry, target_distances):
-        """
-        Interpolate telemetry data to align with target distance points.
-
-        Args:
-            telemetry (list): List of telemetry samples
-            target_distances (np.array): Array of target lap_dist_pct values
-
-        Returns:
-            dict: Dictionary mapping telemetry fields to interpolated arrays
-        """
+        """Interpolate telemetry to align with target distance points for lap comparison."""
         if not telemetry:
             return None
 
-        # Extract distance and telemetry values
         distances = np.array([s.get('lap_dist_pct', 0) for s in telemetry])
         speed = np.array([s.get('speed', 0) for s in telemetry])
         throttle = np.array([s.get('throttle', 0) for s in telemetry])
@@ -265,7 +191,6 @@ class DataExporter:
         yaw_rate = np.array([s.get('yaw_rate', 0) for s in telemetry])
         steering_wheel_angle = np.array([s.get('steering_wheel_angle', 0) for s in telemetry])
 
-        # Interpolate each field to target distances
         interpolated = {
             'speed': np.interp(target_distances, distances, speed),
             'throttle': np.interp(target_distances, distances, throttle),
@@ -282,24 +207,11 @@ class DataExporter:
         return interpolated
 
     def export_comparison_csv(self, session_data, lap_numbers):
-        """
-        Export multi-lap comparison CSV with distance-aligned data.
-
-        Args:
-            session_data (dict): Complete session data
-            lap_numbers (list): List of lap numbers to compare (1-based, as user sees them)
-
-        Returns:
-            str: Path to exported CSV file, or None if export failed
-        """
-        # Collect telemetry for all requested laps
         laps_data = []
 
         for lap_num in lap_numbers:
-            # Convert from 1-based user input to 0-based array index
             lap_index = lap_num - 1
 
-            # Get full lap telemetry
             lap_data = None
             for lap in session_data.get('laps', []):
                 if lap.get('lap_number') == lap_index:
@@ -308,7 +220,7 @@ class DataExporter:
 
             if lap_data and lap_data.get('telemetry'):
                 laps_data.append({
-                    'lap_number': lap_num,  # Keep user-facing lap number for output
+                    'lap_number': lap_num,
                     'telemetry': lap_data['telemetry']
                 })
             else:
@@ -323,10 +235,8 @@ class DataExporter:
             print("Warning: Only one valid lap found, comparison requires at least 2 laps")
             return None
 
-        # Create common distance array (every 0.1% of lap distance)
-        target_distances = np.arange(0, 1.0, 0.001)  # 1000 points around the lap
+        target_distances = np.arange(0, 1.0, 0.001)
 
-        # Interpolate all laps to common distance points
         interpolated_laps = []
         for lap_data in laps_data:
             interpolated = self._interpolate_telemetry(
@@ -343,7 +253,6 @@ class DataExporter:
             print("Error: Failed to interpolate telemetry data")
             return None
 
-        # Generate filename
         metadata = session_data.get('metadata', {})
         track_name = metadata.get('track_name', 'Unknown').replace(' ', '_').replace('/', '-')
         session_type = metadata.get('session_type', 'Unknown').replace(' ', '_')
@@ -353,9 +262,7 @@ class DataExporter:
         filename = f"{track_name}_{session_type}_comparison_laps{lap_range}_{timestamp}.csv"
         filepath = self.export_dir / filename
 
-        # Write CSV file
         with open(filepath, 'w', newline='') as csvfile:
-            # Build column headers
             fieldnames = ['distance_pct', 'distance']
 
             for lap_data in interpolated_laps:
@@ -376,11 +283,10 @@ class DataExporter:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
 
-            # Write data rows
             for i, dist_pct in enumerate(target_distances):
                 row = {
                     'distance_pct': dist_pct,
-                    'distance': dist_pct * 1000  # Approximate distance in meters (will vary by track)
+                    'distance': dist_pct * 1000
                 }
 
                 for lap_data in interpolated_laps:

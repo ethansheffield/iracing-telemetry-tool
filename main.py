@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""
-iRacing Telemetry Analysis Tool - CLI Entry Point
-
-This is the main command-line interface for the telemetry tool.
-Use 'python main.py capture' to start capturing telemetry data.
-"""
-
 import argparse
 import sys
 from datetime import datetime
@@ -15,29 +8,18 @@ from src.exporter import DataExporter
 
 
 def cmd_capture(args):
-    """
-    Handle the 'capture' command - starts live telemetry capture.
-
-    Args:
-        args: Parsed command-line arguments
-    """
+    """Start live telemetry capture from iRacing."""
     print("="*80)
     print("iRacing Telemetry Capture")
     print("="*80)
     print()
 
-    # Create and run telemetry capture
     capture = TelemetryCapture(poll_rate=60)
     capture.run()
 
 
 def cmd_list(args):
-    """
-    Handle the 'list' command - shows all captured sessions.
-
-    Args:
-        args: Parsed command-line arguments
-    """
+    """List all captured sessions."""
     sessions = list_all_sessions()
 
     if not sessions:
@@ -45,25 +27,20 @@ def cmd_list(args):
         print("\nCapture your first session with: python main.py capture")
         return
 
-    # Print header
     print("="*120)
     print(f"{'Session ID':<10} | {'Date':<19} | {'Track':<25} | {'Config':<15} | {'Type':<12} | {'Laps':>5} | {'Duration':>10}")
     print("="*120)
 
-    # Print each session
     for session in sessions:
-        # Format timestamp
         try:
             dt = datetime.fromisoformat(session['timestamp'])
             date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
         except:
             date_str = session['timestamp'][:19]
 
-        # Truncate long names
         track_name = session['track_name'][:25]
         track_config = session['track_config'][:15] if session['track_config'] else '-'
 
-        # Format duration
         duration = session['duration']
         if duration > 0:
             minutes = int(duration // 60)
@@ -72,7 +49,6 @@ def cmd_list(args):
         else:
             duration_str = "-"
 
-        # Print row
         session_id_short = session['session_id'][:8]
         print(f"{session_id_short:<10} | {date_str:<19} | {track_name:<25} | {track_config:<15} | "
               f"{session['session_type']:<12} | {session['total_laps']:>5} | {duration_str:>10}")
@@ -83,15 +59,9 @@ def cmd_list(args):
 
 
 def cmd_info(args):
-    """
-    Handle the 'info' command - shows detailed session information.
-
-    Args:
-        args: Parsed command-line arguments
-    """
+    """Show detailed information about a session."""
     session_id = args.session
 
-    # Load session
     session_data, filepath = load_session(session_id)
 
     if not session_data:
@@ -102,7 +72,6 @@ def cmd_info(args):
     metadata = session_data.get('metadata', {})
     laps = session_data.get('laps', [])
 
-    # Display session metadata
     print("="*80)
     print("SESSION INFORMATION")
     print("="*80)
@@ -117,7 +86,6 @@ def cmd_info(args):
     print(f"File:           {filepath}")
     print()
 
-    # Display lap information
     if laps:
         print("="*80)
         print("LAP TIMES")
@@ -138,7 +106,6 @@ def cmd_info(args):
                 time_str = f"{lap_time:.3f}s"
                 total_duration += lap_time
 
-                # Track best lap
                 if lap_time > 0 and lap_time < best_time:
                     best_time = lap_time
                     best_lap = lap_num
@@ -165,32 +132,16 @@ def cmd_info(args):
 
 
 def _parse_lap_numbers(lap_arg):
-    """
-    Parse lap number argument(s) which can be single value, list, or range.
-
-    Args:
-        lap_arg (str or list): Lap number specification
-
-    Returns:
-        list: List of lap numbers
-
-    Examples:
-        "5" -> [5]
-        ["2", "5", "7"] -> [2, 5, 7]
-        "2-5" -> [2, 3, 4, 5]
-    """
     if isinstance(lap_arg, list):
         lap_numbers = []
         for item in lap_arg:
             if '-' in str(item):
-                # Handle range like "2-5"
                 start, end = map(int, str(item).split('-'))
                 lap_numbers.extend(range(start, end + 1))
             else:
                 lap_numbers.append(int(item))
         return lap_numbers
     else:
-        # Single value or range
         if '-' in str(lap_arg):
             start, end = map(int, str(lap_arg).split('-'))
             return list(range(start, end + 1))
@@ -199,16 +150,10 @@ def _parse_lap_numbers(lap_arg):
 
 
 def cmd_export(args):
-    """
-    Handle the 'export' command - exports lap data to CSV.
-
-    Args:
-        args: Parsed command-line arguments
-    """
+    """Export lap telemetry to CSV."""
     session_id = args.session
     lap_arg = args.lap
 
-    # Parse lap numbers (can be single, multiple, or range)
     try:
         lap_numbers = _parse_lap_numbers(lap_arg)
     except ValueError as e:
@@ -216,7 +161,6 @@ def cmd_export(args):
         print("Examples: --lap 5, --lap 2 5 7, --lap 2-5")
         sys.exit(1)
 
-    # Load session
     session_data, filepath = load_session(session_id)
 
     if not session_data:
@@ -224,16 +168,12 @@ def cmd_export(args):
         print("\nUse 'python main.py list' to see all available sessions")
         sys.exit(1)
 
-    # Create exporter
     exporter = DataExporter()
 
-    # Determine export type based on number of laps
     if len(lap_numbers) == 1:
-        # Single lap export
         lap_number = lap_numbers[0]
         output_path = exporter.export_lap_to_csv(session_data, lap_number)
     else:
-        # Multi-lap comparison export
         output_path = exporter.export_comparison_csv(session_data, lap_numbers)
 
     if output_path:
@@ -243,37 +183,29 @@ def cmd_export(args):
 
 
 def main():
-    """
-    Main CLI entry point - parses arguments and dispatches to appropriate command.
-    """
-    # Create main parser
     parser = argparse.ArgumentParser(
         description='iRacing Telemetry Analysis Tool',
         epilog='For more information, see README.md'
     )
 
-    # Create subcommands
     subparsers = parser.add_subparsers(
         dest='command',
         help='Available commands',
         required=True
     )
 
-    # Add 'capture' command
     capture_parser = subparsers.add_parser(
         'capture',
         help='Start live telemetry capture from iRacing'
     )
     capture_parser.set_defaults(func=cmd_capture)
 
-    # Add 'list' command
     list_parser = subparsers.add_parser(
         'list',
         help='List all captured sessions'
     )
     list_parser.set_defaults(func=cmd_list)
 
-    # Add 'info' command
     info_parser = subparsers.add_parser(
         'info',
         help='Show detailed information about a session'
@@ -285,7 +217,6 @@ def main():
     )
     info_parser.set_defaults(func=cmd_info)
 
-    # Add 'export' command
     export_parser = subparsers.add_parser(
         'export',
         help='Export lap telemetry to CSV'
@@ -303,10 +234,8 @@ def main():
     )
     export_parser.set_defaults(func=cmd_export)
 
-    # Parse arguments
     args = parser.parse_args()
 
-    # Execute the appropriate command
     try:
         args.func(args)
     except Exception as e:
